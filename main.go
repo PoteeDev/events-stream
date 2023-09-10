@@ -8,8 +8,57 @@ import (
 
 	"github.com/PoteeDev/admin/api/database"
 	"github.com/PoteeDev/events-stream/websocket"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
+
+type RoundInfo struct {
+	TeamName string              `json:"team_name,omitempty"`
+	TeamHost string              `json:"team_host,omitempty"`
+	Services map[string]Services `json:"services,omitempty"`
+}
+
+type Services struct {
+	PingStatus int
+	Checkers   map[string]Checker
+	Exploits   map[string]Exploit //exploit name and status
+}
+
+type Checker struct {
+	GetStatus int
+	PutStatus int
+}
+
+type Exploit struct {
+	Cost   int
+	Status int
+}
+
+type Events struct {
+	Events map[string]RoundInfo `bson:"events"`
+}
+
+type documentKey struct {
+	ID primitive.ObjectID `bson:"_id"`
+}
+
+type changeID struct {
+	Data string `bson:"_data"`
+}
+
+type namespace struct {
+	Db   string `bson:"db"`
+	Coll string `bson:"coll"`
+}
+
+type changeEvent struct {
+	ID            changeID            `bson:"_id"`
+	OperationType string              `bson:"operationType"`
+	ClusterTime   primitive.Timestamp `bson:"clusterTime"`
+	FullDocument  Events              `bson:"fullDocument"`
+	DocumentKey   documentKey         `bson:"documentKey"`
+	Ns            namespace           `bson:"ns"`
+}
 
 var ctx = context.Background()
 
@@ -22,8 +71,14 @@ func watchEvents(pool *websocket.Pool) {
 	}
 	defer cs.Close(ctx)
 	for cs.Next(context.TODO()) {
-		fmt.Println(cs.Current)
-		pool.Broadcast <- websocket.Message{Message: string(cs.Current)}
+		var changeEvent changeEvent
+
+		err := cs.Decode(&changeEvent)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Println(changeEvent)
+		pool.Broadcast <- websocket.Message{Message: changeEvent.FullDocument}
 	}
 }
 

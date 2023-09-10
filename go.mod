@@ -9,8 +9,9 @@ require (
 )
 
 require (
-	github.com/PoteeDev/entities v0.0.0-20221107145045-5f6377729919 // indirect
+	github.com/PoteeDev/entities v0.0.0-20230820135949-81720888809f // indirect
 	github.com/golang/snappy v0.0.4 // indirect
+	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect

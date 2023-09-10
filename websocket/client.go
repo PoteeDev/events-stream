@@ -13,8 +13,8 @@ type Client struct {
 }
 
 type Message struct {
-	Id      int    `json:"id,omitempty"`
-	Message string `json:"message,omitempty"`
+	Id      int         `json:"id,omitempty"`
+	Message interface{} `json:"message,omitempty"`
 }
 
 func (c *Client) Read() {
