@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/PoteeDev/admin/api/database"
+	"github.com/PoteeDev/events-stream/models"
 	"github.com/PoteeDev/events-stream/websocket"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -19,23 +20,23 @@ type RoundInfo struct {
 }
 
 type Services struct {
-	PingStatus int
-	Checkers   map[string]Checker
-	Exploits   map[string]Exploit //exploit name and status
+	PingStatus int                `json:"ping_status,omitempty"`
+	Checkers   map[string]Checker `json:"checkers,omitempty"`
+	Exploits   map[string]Exploit `json:"exploits,omitempty"` //exploit name and status
 }
 
 type Checker struct {
-	GetStatus int
-	PutStatus int
+	GetStatus int `json:"get_status,omitempty"`
+	PutStatus int `json:"put_status,omitempty"`
 }
 
 type Exploit struct {
-	Cost   int
-	Status int
+	Cost   int `json:"cost,omitempty"`
+	Status int `json:"status,omitempty"`
 }
 
 type Events struct {
-	Events map[string]RoundInfo `bson:"events"`
+	Events map[string]RoundInfo `bson:"events" json:"events"`
 }
 
 type documentKey struct {
@@ -78,8 +79,43 @@ func watchEvents(pool *websocket.Pool) {
 			log.Fatal(err)
 		}
 		log.Println(changeEvent)
-		pool.Broadcast <- websocket.Message{Message: changeEvent.FullDocument}
+		pool.Broadcast <- websocket.Message{Message: ConvertTeamsEvents(changeEvent)}
 	}
+}
+
+func ConvertTeamsEvents(events changeEvent) *models.TeamsEvents {
+	teamsEvents := models.TeamsEvents{}
+	for _, event := range events.FullDocument.Events {
+		services := []models.TeamServices{}
+		for serviceName, service := range event.Services {
+			checkers := []models.Checkers{}
+			for _, checker := range service.Checkers {
+				checkers = append(checkers, models.Checkers{
+					PutStatus: checker.PutStatus,
+					GetStatus: checker.GetStatus,
+				})
+			}
+			exploits := []models.Exploits{}
+			for _, exploit := range service.Exploits {
+				if exploit.Status >= 0 {
+					exploits = append(exploits, models.Exploits{
+						Status: exploit.Status,
+					})
+				}
+			}
+			services = append(services, models.TeamServices{
+				Name:     serviceName,
+				Checkers: checkers,
+				Exploits: exploits,
+			})
+		}
+
+		teamsEvents.Teams = append(teamsEvents.Teams, models.Teams{
+			Name:     event.TeamName,
+			Services: services,
+		})
+	}
+	return &teamsEvents
 }
 
 func serveWs(pool *websocket.Pool, w http.ResponseWriter, r *http.Request) {
